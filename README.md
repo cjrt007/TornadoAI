@@ -59,9 +59,29 @@ The container image is built on top of `kalilinux/kali-rolling` so you retain th
 while layering the MCP server and assessment tooling on top.
 
 ```bash
-docker build -t tornadoai-mcp .
+docker build --no-cache -t tornadoai-mcp .
 docker run --rm --name tornadoai-mcp-container -p 8000:8000 -v "$PWD"/data:/opt/tornadoai/data tornadoai-mcp
 ```
+
+> **Why `--no-cache`?**
+>
+> Earlier revisions of the Dockerfile attempted to install `mobsf`, `frida-tools`, and `objection` from the
+> Kali repositories. Those packages are not published in the default `kali-rolling` apt sources, so cached
+> build layers can continue to fail with `E: Unable to locate package ...`. Building with `--no-cache`
+> forces Docker to pick up the current instructions that install those tools via `pip` and git instead.
+
+> **Mirror troubleshooting**
+>
+> If you still encounter `Unable to locate package` errors after pulling the latest Dockerfile, confirm
+> that the build host can reach `http.kali.org`. The Dockerfile now rewrites `/etc/apt/sources.list` to
+> point directly at the official mirror so intermittent geo-IP redirects do not break the build. When
+> running outside of Docker (or with a proxy), mirror issues can be diagnosed with:
+>
+> ```bash
+> docker run --rm kalilinux/kali-rolling bash -lc "cat /etc/apt/sources.list && apt-get update"
+> ```
+>
+> Substitute your preferred mirror if local policies require it.
 
 > **Windows PowerShell**
 >
@@ -149,8 +169,9 @@ limited to:
 > **Note**
 >
 > Kali packages exist for most tools, but some (such as MobSF, Frida, and Objection) are pulled in via
-> Python packages or git clones during the Docker build. The image places MobSF under
-> `/opt/tools/mobsf` for convenience.
+> Python packages or git clones during the Docker build because they are not available as apt packages.
+> The image places MobSF under `/opt/tools/mobsf` for convenience, while `frida-tools`, `objection`,
+> and `reflutter` are exposed through the global Python environment.
 
 Extend the `app/tooling.py` catalog or the Dockerfile to integrate bespoke tooling required by your
 engagement methodology.

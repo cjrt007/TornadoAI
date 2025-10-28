@@ -6,12 +6,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
     APP_HOME=/opt/tornadoai \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
+# Refresh Kali apt sources to a known-good mirror before installing tooling
+RUN printf 'deb http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware\n' \
+        > /etc/apt/sources.list
+
 # Install system dependencies and security tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
         python3-venv \
         python3-dev \
+        python3-wheel \
         git \
         curl \
         wget \
@@ -43,8 +48,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pip based tooling (advanced mobile / iOS helpers)
-RUN python3 -m pip install --no-cache-dir --upgrade pip \
+# Upgrade pip tooling and install packages that Kali does not provide via apt
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python3 -m pip install --no-cache-dir \
         frida-tools \
         objection \
