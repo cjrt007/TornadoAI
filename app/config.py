@@ -56,6 +56,34 @@ class ScanStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class AgentRole(str, Enum):
+    """Functional role performed by an autonomous agent."""
+
+    DECISION_ENGINE = "decision_engine"
+    OPERATIONS = "operations"
+    ANALYST = "analyst"
+    REPORTING = "reporting"
+
+
+class AgentStatus(str, Enum):
+    """Connection and readiness state of an agent."""
+
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    READY = "ready"
+    BUSY = "busy"
+    ERROR = "error"
+
+
+class RiskLevel(str, Enum):
+    """Normalized qualitative risk buckets."""
+
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 DEFAULT_REPORT_SECTIONS: List[str] = [
     "Title",
     "Index",
