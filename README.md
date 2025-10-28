@@ -23,15 +23,82 @@ and integrations with a curated toolset covering the OWASP Top 10 (web and mobil
 - Docker Engine 24+
 - (Optional) Python 3.11+ for local development without Docker.
 
+#### Windows-specific setup
+
+The Dockerfile targets the Linux engine. On Windows you must run Docker Desktop and
+ensure the **Docker Desktop Backend Service** is active so that the
+`//./pipe/dockerDesktopLinuxEngine` named pipe is available. If you encounter an
+error such as `The system cannot find the file specified` while running
+`docker build`, take the following steps:
+
+1. Launch Docker Desktop and wait for the whale icon to report that the engine is
+   running.
+2. Open an elevated PowerShell window and enable the WSL 2 backend (requires a
+   system restart the first time):
+   ```powershell
+   wsl --install
+   wsl --set-default-version 2
+   ```
+3. Restart Docker Desktop so that it reconnects to the Linux engine.
+4. Verify connectivity from PowerShell:
+   ```powershell
+   docker info
+   docker version
+   ```
+5. Re-run the build inside the repository directory:
+   ```powershell
+   docker build -t tornadoai-mcp .
+   ```
+
+If the command still fails, confirm that virtualization is enabled in the BIOS and
+that security software is not blocking the Docker named pipe.
+
 ### Build and Run with Docker
+
+The container image is built on top of `kalilinux/kali-rolling` so you retain the full Kali userland
+while layering the MCP server and assessment tooling on top.
 
 ```bash
 docker build -t tornadoai-mcp .
-docker run --rm -p 8000:8000 -v "$PWD"/data:/opt/tornadoai/data tornadoai-mcp
+docker run --rm --name tornadoai-mcp-container -p 8000:8000 -v "$PWD"/data:/opt/tornadoai/data tornadoai-mcp
 ```
+
+> **Windows PowerShell**
+>
+> PowerShell does not concatenate paths the same way as POSIX shells. The literal string
+> `"$PWD"/data` is treated as a division operation, which results in Docker receiving an empty
+> image reference and emitting the `invalid reference format` error. Use `Join-Path` (or an explicit
+> variable) to build the bind mount instead:
+>
+> ```powershell
+> $workdir = (Get-Location).Path
+> docker run --rm -p 8000:8000 -v (Join-Path $workdir 'data')+':/opt/tornadoai/data' tornadoai-mcp
+> ```
+>
+> Alternatively, create the host path with backslashes directly:
+>
+> ```powershell
+> $workdir = (Get-Location).Path
+> docker run --rm -p 8000:8000 -v "$workdir\data:/opt/tornadoai/data" tornadoai-mcp
+> ```
 
 The API is now available at `http://localhost:8000`. Interactive documentation is provided via the
 [FastAPI Swagger UI](http://localhost:8000/docs) and ReDoc (`/redoc`).
+
+#### Verify bundled tooling
+
+Once the container is running, you can exec into it to confirm that key tools—such as MobSF, Frida, and
+Objection—are available alongside the broader Kali arsenal:
+
+```bash
+docker exec -it tornadoai-mcp-container bash
+which frida
+objection --help
+ls /opt/tools/mobsf
+```
+
+MobSF is installed at `/opt/tools/mobsf` with its Python dependencies resolved during the Docker build,
+allowing the framework to be launched immediately when needed.
 
 ### Local Development
 
@@ -78,6 +145,12 @@ limited to:
 - `jadx`, `apktool`, `MobSF`, `reflutter`, `frida-tools`, `objection` for mobile reverse engineering and
   dynamic analysis
 - iOS support via `libimobiledevice-utils`, `ifuse`, `ideviceinstaller`, `idb-companion`
+
+> **Note**
+>
+> Kali packages exist for most tools, but some (such as MobSF, Frida, and Objection) are pulled in via
+> Python packages or git clones during the Docker build. The image places MobSF under
+> `/opt/tools/mobsf` for convenience.
 
 Extend the `app/tooling.py` catalog or the Dockerfile to integrate bespoke tooling required by your
 engagement methodology.
