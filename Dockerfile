@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sqlmap \
         jadx \
         apktool \
+        mobsf \
+        frida-tools \
+        objection \
         dirb \
         whatweb \
         ffuf \
@@ -40,12 +43,6 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip \
         objection \
         reflutter \
         idb-companion
-
-# Pull additional tooling that is not available via apt repositories
-RUN mkdir -p /opt/tools \
-    && git clone --depth 1 https://github.com/MobSF/Mobile-Security-Framework-MobSF.git /opt/tools/mobsf \
-    && python3 -m pip install --no-cache-dir -r /opt/tools/mobsf/requirements.txt \
-    && rm -rf /opt/tools/mobsf/.git
 
 WORKDIR ${APP_HOME}
 
