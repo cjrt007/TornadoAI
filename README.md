@@ -63,6 +63,12 @@ docker build --no-cache -t tornadoai-mcp .
 docker run --rm --name tornadoai-mcp-container -p 8000:8000 -v "$PWD"/data:/opt/tornadoai/data tornadoai-mcp
 ```
 
+Set a specific Burp Suite Community release during the build by overriding the `BURP_VERSION` argument:
+
+```bash
+docker build --build-arg BURP_VERSION=2024.5.2 -t tornadoai-mcp .
+```
+
 > **Why `--no-cache`?**
 >
 > Earlier revisions of the Dockerfile attempted to install `mobsf`, `frida-tools`, and `objection` from the
@@ -115,10 +121,13 @@ docker exec -it tornadoai-mcp-container bash
 which frida
 objection --help
 ls /opt/tools/mobsf
+burpsuite --help
 ```
 
 MobSF is installed at `/opt/tools/mobsf` with its Python dependencies resolved during the Docker build,
 allowing the framework to be launched immediately when needed.
+The wrapper script placed at `/usr/local/bin/burpsuite` executes the downloaded Community Edition JAR
+with the system `java` runtime.
 
 ### Local Development
 
@@ -162,16 +171,17 @@ limited to:
 - `nmap`, `masscan` for network reconnaissance
 - `nuclei`, `sqlmap`, `whatweb`, `dirb` for web vulnerability discovery
 - `ffuf`, `wfuzz` for fuzzing
-- `jadx`, `apktool`, `MobSF`, `reflutter`, `frida-tools`, `objection` for mobile reverse engineering and
-  dynamic analysis
+- `jadx`, `apktool`, `MobSF`, `reflutter`, `frida-tools`, `objection`, `Burp Suite Community` for mobile
+  reverse engineering, dynamic analysis, and web proxying
 - iOS support via `libimobiledevice-utils`, `ifuse`, `ideviceinstaller`, `idb-companion`
 
 > **Note**
 >
-> Kali packages exist for most tools, but some (such as MobSF, Frida, and Objection) are pulled in via
-> Python packages or git clones during the Docker build because they are not available as apt packages.
-> The image places MobSF under `/opt/tools/mobsf` for convenience, while `frida-tools`, `objection`,
-> and `reflutter` are exposed through the global Python environment.
+> Kali packages exist for most tools, but some (such as MobSF, Frida, Objection, and Burp Suite Community)
+> are pulled in via Python packages, git clones, or direct downloads during the Docker build because they
+> are not available as apt packages. The image places MobSF under `/opt/tools/mobsf`, downloads the Burp
+> Suite Community JAR into `/opt/tools/burpsuite`, and exposes `frida-tools`, `objection`, and `reflutter`
+> through the global Python environment.
 
 Extend the `app/tooling.py` catalog or the Dockerfile to integrate bespoke tooling required by your
 engagement methodology.

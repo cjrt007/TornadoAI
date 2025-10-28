@@ -40,13 +40,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffuf \
         wfuzz \
         masscan \
-        burpsuite \
         libimobiledevice-utils \
         usbmuxd \
         ifuse \
         ideviceinstaller \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+ARG BURP_VERSION=2024.5.1
+RUN mkdir -p /opt/tools/burpsuite \
+    && curl -L --output /opt/tools/burpsuite/burpsuite.jar "https://portswigger.net/burp/releases/download?product=community&version=${BURP_VERSION}&type=Jar" \
+    && printf '#!/bin/bash\nexec java -jar /opt/tools/burpsuite/burpsuite.jar "$@"\n' > /usr/local/bin/burpsuite \
+    && chmod +x /usr/local/bin/burpsuite
 
 # Upgrade pip tooling and install packages that Kali does not provide via apt
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
