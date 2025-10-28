@@ -5,8 +5,20 @@ from datetime import datetime
 from typing import Dict, Iterable, Optional
 from uuid import UUID
 
-from .config import ScanStatus
-from .models import Report, ReportCreate, ReportUpdate, Scan, ScanCreate, ScanTask, ScanUpdate
+from .config import AgentStatus, ScanStatus
+from .models import (
+    AgentConnection,
+    AgentRegistration,
+    AgentUpdate,
+    Report,
+    ReportCreate,
+    ReportUpdate,
+    Scan,
+    ScanCreate,
+    ScanTask,
+    ScanUpdate,
+    VulnerabilityIntelligence,
+)
 
 
 class ScanStore:
@@ -89,3 +101,66 @@ class ReportStore:
 
     def delete(self, report_id: UUID) -> Optional[Report]:
         return self._reports.pop(report_id, None)
+
+
+class AgentStore:
+    """Tracks connected agents and their operational state."""
+
+    def __init__(self) -> None:
+        self._agents: Dict[UUID, AgentConnection] = {}
+
+    def list(self) -> Iterable[AgentConnection]:
+        return self._agents.values()
+
+    def get(self, agent_id: UUID) -> Optional[AgentConnection]:
+        return self._agents.get(agent_id)
+
+    def register(self, payload: AgentRegistration) -> AgentConnection:
+        agent = AgentConnection(**payload.dict(exclude_none=True))
+        agent.status = AgentStatus.READY
+        self._agents[agent.id] = agent
+        return agent
+
+    def update(self, agent_id: UUID, payload: AgentUpdate) -> Optional[AgentConnection]:
+        agent = self.get(agent_id)
+        if not agent:
+            return None
+        update_data = payload.dict(exclude_unset=True, exclude_none=True)
+        for field, value in update_data.items():
+            setattr(agent, field, value)
+        agent.last_heartbeat_at = datetime.utcnow()
+        return agent
+
+    def heartbeat(self, agent_id: UUID) -> Optional[AgentConnection]:
+        agent = self.get(agent_id)
+        if not agent:
+            return None
+        agent.last_heartbeat_at = datetime.utcnow()
+        if agent.status == AgentStatus.DISCONNECTED:
+            agent.status = AgentStatus.READY
+        return agent
+
+    def set_status(self, agent_id: UUID, status: AgentStatus) -> Optional[AgentConnection]:
+        agent = self.get(agent_id)
+        if not agent:
+            return None
+        agent.status = status
+        agent.last_heartbeat_at = datetime.utcnow()
+        return agent
+
+    def ready_agents(self) -> Iterable[AgentConnection]:
+        return [agent for agent in self._agents.values() if agent.status == AgentStatus.READY]
+
+
+class IntelligenceStore:
+    """Caches generated vulnerability intelligence per scan."""
+
+    def __init__(self) -> None:
+        self._intelligence: Dict[UUID, VulnerabilityIntelligence] = {}
+
+    def get(self, scan_id: UUID) -> Optional[VulnerabilityIntelligence]:
+        return self._intelligence.get(scan_id)
+
+    def store(self, scan_id: UUID, intelligence: VulnerabilityIntelligence) -> VulnerabilityIntelligence:
+        self._intelligence[scan_id] = intelligence
+        return intelligence

@@ -15,6 +15,8 @@ and integrations with a curated toolset covering the OWASP Top 10 (web and mobil
   web fuzzing, mobile reverse engineering, and iOS testing workflows.
 - **Custom reporting** – Compose Markdown-based reports with selectable sections, inline editing support,
   image placeholders, and export-ready Markdown generation.
+- **Autonomous multi-agent orchestration** – Connect MCP-compatible AI agents, generate adaptive
+  execution plans, and capture live vulnerability intelligence for downstream reporting.
 
 ## Getting Started
 
@@ -161,6 +163,14 @@ with the system `java` runtime.
   ```bash
   http POST :8000/reports scan_id={scan_id} title="Q2 Assessment"
   http GET :8000/reports/{report_id}/markdown
+  ```
+- **Register an MCP agent** and generate an autonomous execution plan:
+  ```bash
+  http POST :8000/agents name="Claude Red Team" provider="anthropic" role="analyst" \
+    capabilities:='["recon","vuln-intel"]'
+  http POST :8000/scans/{scan_id}/orchestrate threat_level=high \
+    observed_vulnerabilities:='["OWASP_A03_INJECTION"]'
+  http GET :8000/scans/{scan_id}/intelligence/markdown
   ```
 
 ## Security Tooling Inventory

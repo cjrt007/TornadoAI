@@ -7,8 +7,14 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 
-from .config import ScanStatus
+from .agents import MultiAgentOrchestrator
+from .config import AgentStatus, ScanStatus
 from .models import (
+    AgentConnection,
+    AgentRegistration,
+    AgentUpdate,
+    ExecutionPlan,
+    OrchestrationRequest,
     Report,
     ReportCreate,
     ReportUpdate,
@@ -17,9 +23,15 @@ from .models import (
     ScanTask,
     ScanUpdate,
     ToolDescriptor,
+    VulnerabilityIntelligence,
 )
-from .reporting import build_markdown, summarize_vulnerabilities
-from .store import ReportStore, ScanStore
+from .reporting import (
+    build_markdown,
+    render_intelligence_overview,
+    render_vulnerability_cards,
+    summarize_vulnerabilities,
+)
+from .store import AgentStore, IntelligenceStore, ReportStore, ScanStore
 from .tooling import list_tools, tool_lookup
 
 app = FastAPI(
@@ -33,6 +45,9 @@ app = FastAPI(
 
 scan_store = ScanStore()
 report_store = ReportStore()
+agent_store = AgentStore()
+intelligence_store = IntelligenceStore()
+orchestrator = MultiAgentOrchestrator(scan_store, agent_store, intelligence_store)
 
 
 @app.get("/health", tags=["meta"])
@@ -47,6 +62,56 @@ def get_tools() -> List[ToolDescriptor]:
     """Return catalog of integrated tools."""
 
     return list_tools()
+
+
+@app.get("/agents", response_model=List[AgentConnection], tags=["agents"])
+def list_agents() -> List[AgentConnection]:
+    """List registered MCP-compatible agents."""
+
+    return list(agent_store.list())
+
+
+@app.post("/agents", response_model=AgentConnection, tags=["agents"], status_code=201)
+def register_agent(payload: AgentRegistration) -> AgentConnection:
+    """Register a new autonomous agent with the platform."""
+
+    return agent_store.register(payload)
+
+
+@app.get("/agents/{agent_id}", response_model=AgentConnection, tags=["agents"])
+def retrieve_agent(agent_id: UUID) -> AgentConnection:
+    agent = agent_store.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+@app.patch("/agents/{agent_id}", response_model=AgentConnection, tags=["agents"])
+def update_agent(agent_id: UUID, payload: AgentUpdate) -> AgentConnection:
+    agent = agent_store.update(agent_id, payload)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+@app.post("/agents/{agent_id}/heartbeat", response_model=AgentConnection, tags=["agents"])
+def heartbeat_agent(agent_id: UUID) -> AgentConnection:
+    agent = agent_store.heartbeat(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+@app.post(
+    "/agents/{agent_id}/status/{status}",
+    response_model=AgentConnection,
+    tags=["agents"],
+)
+def set_agent_status(agent_id: UUID, status: AgentStatus) -> AgentConnection:
+    agent = agent_store.set_status(agent_id, status)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
 
 
 @app.post("/scans", response_model=Scan, tags=["scans"], status_code=201)
@@ -105,6 +170,52 @@ def set_scan_status(scan_id: UUID, status: ScanStatus) -> Scan:
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan
+
+
+@app.post(
+    "/scans/{scan_id}/orchestrate",
+    response_model=ExecutionPlan,
+    tags=["scans"],
+    summary="Generate an autonomous execution plan",
+)
+def orchestrate_scan(scan_id: UUID, payload: OrchestrationRequest) -> ExecutionPlan:
+    scan = scan_store.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    try:
+        return orchestrator.plan(scan, payload)
+    except ValueError as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get(
+    "/scans/{scan_id}/intelligence",
+    response_model=VulnerabilityIntelligence,
+    tags=["scans"],
+    summary="Retrieve vulnerability intelligence for a scan",
+)
+def get_scan_intelligence(scan_id: UUID) -> VulnerabilityIntelligence:
+    intelligence = intelligence_store.get(scan_id)
+    if not intelligence:
+        raise HTTPException(status_code=404, detail="No intelligence available for scan")
+    return intelligence
+
+
+@app.get(
+    "/scans/{scan_id}/intelligence/markdown",
+    response_model=str,
+    tags=["reports"],
+    summary="Render vulnerability intelligence as Markdown",
+)
+def get_scan_intelligence_markdown(scan_id: UUID) -> str:
+    intelligence = intelligence_store.get(scan_id)
+    if not intelligence:
+        raise HTTPException(status_code=404, detail="No intelligence available for scan")
+    overview = render_intelligence_overview(intelligence)
+    cards = render_vulnerability_cards(intelligence.cards)
+    if cards:
+        return f"{overview}\n\n{cards}".strip()
+    return overview
 
 
 @app.post("/reports", response_model=Report, tags=["reports"], status_code=201)
