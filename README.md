@@ -23,36 +23,6 @@ and integrations with a curated toolset covering the OWASP Top 10 (web and mobil
 - Docker Engine 24+
 - (Optional) Python 3.11+ for local development without Docker.
 
-#### Windows-specific setup
-
-The Dockerfile targets the Linux engine. On Windows you must run Docker Desktop and
-ensure the **Docker Desktop Backend Service** is active so that the
-`//./pipe/dockerDesktopLinuxEngine` named pipe is available. If you encounter an
-error such as `The system cannot find the file specified` while running
-`docker build`, take the following steps:
-
-1. Launch Docker Desktop and wait for the whale icon to report that the engine is
-   running.
-2. Open an elevated PowerShell window and enable the WSL 2 backend (requires a
-   system restart the first time):
-   ```powershell
-   wsl --install
-   wsl --set-default-version 2
-   ```
-3. Restart Docker Desktop so that it reconnects to the Linux engine.
-4. Verify connectivity from PowerShell:
-   ```powershell
-   docker info
-   docker version
-   ```
-5. Re-run the build inside the repository directory:
-   ```powershell
-   docker build -t tornadoai-mcp .
-   ```
-
-If the command still fails, confirm that virtualization is enabled in the BIOS and
-that security software is not blocking the Docker named pipe.
-
 ### Build and Run with Docker
 
 ```bash
